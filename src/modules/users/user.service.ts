@@ -58,7 +58,7 @@ class UserService {
     }
 
     const access_token = GenerateToken({
-      payload: { id: user._id.toString() },
+      payload: { id: user._id},
       secret_key: ACCESS_SECRET_KEY,
       options: {
         jwtid: randomUUID(),

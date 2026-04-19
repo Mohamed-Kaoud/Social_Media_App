@@ -1,35 +1,25 @@
-import jwt, { SignOptions, VerifyOptions } from "jsonwebtoken";
+import jwt, { JwtPayload, SignOptions, VerifyOptions } from "jsonwebtoken"
 
-export type AccessTokenPayload = {
-  jti: any;
-  iat: number;
-  id: string;
-};
+type GenerateTokenParams = {
+    payload: string | Buffer | object,
+    secret_key: string,
+    options?: SignOptions
+}
+type VerifyTokenParams = {
+    token: string,
+    secret_key: string,
+    options?: VerifyOptions
+}
 
-export const GenerateToken = <T extends object>({
-  payload,
-  secret_key,
-  options,
-}: {
-  payload: T;
-  secret_key: string;
-  options?: SignOptions;
-}) => {
-  return jwt.sign(payload, secret_key, options);
-};
+interface ITokenPayload extends JwtPayload {
+  id: string,
+  jti: string
+}
 
-export const VerifyToken = <T extends object>({
-  token,
-  secret_key,
-  options,
-}: {
-  token: string;
-  secret_key: string;
-  options?: VerifyOptions;
-}): T | null => {
-  try {
-    return jwt.verify(token, secret_key, options) as T;
-  } catch {
-    return null;
-  }
-};
+export const GenerateToken = ({payload , secret_key , options = {}}: GenerateTokenParams): string => {
+    return jwt.sign(payload , secret_key , options)
+}
+
+export const VerifyToken = ({token , secret_key , options = {}}: VerifyTokenParams): ITokenPayload  => {
+    return jwt.verify(token , secret_key , options) as ITokenPayload
+}
