@@ -4,20 +4,22 @@ import { IUpdatePasswordType } from "./user.validation";
 import { Compare, Hash } from "../../common/utils/security/hash.security";
 import { AppError } from "../../common/utils/global-error-handler";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { ACCESS_SECRET_KEY, AUDIENCE } from "../../config/config.service";
-import { ProviderEnum } from "../../common/enum/user.enum";
-import { GenerateToken } from "../../common/utils/token.service";
+import { ACCESS_SECRET_KEY, ACCESS_SECRET_KEY_ADMIN, ACCESS_SECRET_KEY_USER, AUDIENCE } from "../../config/config.service";
+import { ProviderEnum, RoleEnum } from "../../common/enum/user.enum";
 import { randomUUID } from "node:crypto";
+import TokenService from "../../common/utils/token.service";
+import { successResponse } from "../../common/utils/response.success";
 
 class UserService {
   private readonly _userModel = new UserRepository();
+  private readonly _tokenService = TokenService;
   constructor() {}
 
-  getProfile = async (req: any, res: Response) => {
-    res.status(200).json({ message: "Done", data: req.user });
+  getProfile = async (req: Request, res: Response) => {
+    successResponse({ res, data: { user: req.user } });
   };
 
-  updatePassword = async (req: any, res: Response) => {
+  updatePassword = async (req: Request, res: Response) => {
     const { oldPassword, newPassword }: IUpdatePasswordType = req.body;
 
     if (!Compare({ plain_text: oldPassword, cipher_text: req.user.password })) {
@@ -29,7 +31,7 @@ class UserService {
     req.user.password = hashedPassword;
     await req.user.save();
 
-    res.status(200).json({ message: "Password updated successfully ✅" });
+    successResponse({ res, message: "Password updated successfully ✅" });
   };
 
   signUpWithGmail = async (req: Request, res: Response) => {
@@ -57,15 +59,16 @@ class UserService {
       throw new AppError("Please, Login with system 🔴", 400);
     }
 
-    const access_token = GenerateToken({
-      payload: { id: user._id},
-      secret_key: ACCESS_SECRET_KEY,
+    const access_token = this._tokenService.GenerateToken({
+      payload: { id: user._id },
+      secret_key: user.role == RoleEnum.user ? ACCESS_SECRET_KEY_USER : ACCESS_SECRET_KEY_ADMIN,
       options: {
         jwtid: randomUUID(),
       },
     });
 
-    res.status(200).json({
+    successResponse({
+      res,
       message: `${name} signed up with gmail successfully ✅`,
       data: { access_token },
     });

@@ -10,8 +10,8 @@ import {
 } from "./common/utils/global-error-handler";
 import checkConnectionDB from "./DB/connectionDB";
 import authRouter from "./modules/auth/auth.controller";
-import { redisConnection } from "./DB/redis/redis.connect";
 import userRouter from "./modules/users/user.controller";
+import redisService from "./common/service/redis.service";
 const app: express.Application = express();
 const port: number = PORT;
 
@@ -29,7 +29,7 @@ const bootstrap = () => {
   app.use(cors(), helmet(), limiter);
 
   checkConnectionDB();
-  redisConnection();
+  redisService.connect()
 
   app.get("/", (req: Request, res: Response) => {
     res.status(200).json({ message: "Welcome on Social Media App 😍🤩" });

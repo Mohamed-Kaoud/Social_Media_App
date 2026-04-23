@@ -81,6 +81,8 @@ const userSchema = new mongoose.Schema<IUser>(
     timestamps: true,
     strict: true,
     strictQuery: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   },
 );
 
@@ -89,10 +91,6 @@ userSchema
   .get(function () {
     return this.firstName + " " + this.lastName;
   })
-  .set(function (v: string) {
-    const [firstName, lastName] = v.split(" ") || [];
-    this.set({ firstName, lastName });
-  });
 
 const userModel =
   mongoose.models.User || mongoose.model<IUser>("User", userSchema);

@@ -8,35 +8,36 @@ import { Encrypt } from "../../common/utils/security/encrypt.security";
 import { generateOtp, sendEmail } from "../../common/utils/email/send.email";
 import { emailTemplate } from "../../common/utils/email/email.template";
 import {
-  IConfirmEmailType,
-  IForgetPasswordType,
-  ISignInType,
-  ISignUpType,
+  confirmEmailDto,
+  forgetPasswordDto,
+  signInDto,
+  signUpDto,
 } from "./auth.validation";
-import { ProviderEnum } from "../../common/enum/user.enum";
+import { ProviderEnum, RoleEnum } from "../../common/enum/user.enum";
 import { randomUUID } from "node:crypto";
-import { GenerateToken } from "../../common/utils/token.service";
-import { ACCESS_SECRET_KEY, AUDIENCE } from "../../config/config.service";
+import {
+  ACCESS_SECRET_KEY_ADMIN,
+  ACCESS_SECRET_KEY_USER,
+  REFRESH_SECRET_KEY_ADMIN,
+  REFRESH_SECRET_KEY_USER,
+} from "../../config/config.service";
 import { eventEmitter } from "../../common/utils/email/email.events";
 import { EmailEnum } from "../../common/enum/email.enum";
-import {
-  deleteKey,
-  get,
-  incr,
-  max_otp_key,
-  otp_key,
-  revoked_key,
-  setValue,
-} from "../../DB/redis/redis.service";
+import { successResponse } from "../../common/utils/response.success";
+import redisService from "../../common/service/redis.service";
+import TokenService from "../../common/utils/token.service";
 
 class AuthService {
   private readonly _userModel = new UserRepository();
+  private readonly _redisService = redisService;
+  private readonly _tokenService = TokenService;
 
   constructor() {}
 
   signUp = async (req: Request, res: Response) => {
     let {
-      userName,
+      firstName,
+      lastName,
       email,
       password,
       age,
@@ -44,14 +45,15 @@ class AuthService {
       address,
       gender,
       role,
-    }: ISignUpType = req.body;
+    }: signUpDto = req.body;
     const emailExist = await this._userModel.findOne({ filter: { email } });
     if (emailExist) {
       throw new AppError("Email already exist 🔴", 409);
     }
 
     const user: HydratedDocument<IUser> = await this._userModel.create({
-      userName,
+      firstName,
+      lastName,
       email,
       password: Hash({ plain_text: password }),
       age,
@@ -69,26 +71,31 @@ class AuthService {
         subject: "Email Confirmation ✅",
         html: emailTemplate(otp),
       });
-      await setValue({
-        key: otp_key({ email: email }),
+      await this._redisService.setValue({
+        key: this._redisService.otp_key({ email: email }),
         value: Hash({ plain_text: `${otp}` }),
         ttl: 60 * 2,
       });
-      await setValue({
-        key: max_otp_key(email),
-        value: 1,
+      await this._redisService.setValue({
+        key: this._redisService.max_otp_key(email),
+        value: "1",
         ttl: 60 * 6,
       });
     });
-    res
-      .status(201)
-      .json({ message: `${userName} signed up successfully ✅`, data: user });
+    successResponse({
+      res,
+      status: 201,
+      message: `${firstName} ${lastName} signed up successfully ✅`,
+      data: user,
+    });
   };
 
   confirmEmail = async (req: Request, res: Response) => {
-    const { email, code }: IConfirmEmailType = req.body;
+    const { email, code }: confirmEmailDto = req.body;
 
-    const otpValue = await get(otp_key({ email }));
+    const otpValue = await this._redisService.get(
+      this._redisService.otp_key({ email }),
+    );
 
     if (!otpValue) {
       throw new Error(`OTP is expired 🔴`, { cause: 404 });
@@ -109,15 +116,15 @@ class AuthService {
       throw new AppError("Invalid email or already confirmed 🔴", 400);
     }
 
-    await deleteKey(otp_key({ email, subject: EmailEnum.confirmEmail }));
+    await this._redisService.deleteKey(
+      this._redisService.otp_key({ email, subject: EmailEnum.confirmEmail }),
+    );
 
-    res
-      .status(200)
-      .json({ message: `Email: ${email} confirmed successfully ✅` });
+    successResponse({ res, message: `${email} confirmed successfully ✅` });
   };
 
   signIn = async (req: Request, res: Response) => {
-    const { email, password }: ISignInType = req.body;
+    const { email, password }: signInDto = req.body;
 
     const user = await this._userModel.findOne({
       filter: {
@@ -135,22 +142,37 @@ class AuthService {
       throw new AppError("Invalid password ❎", 400);
     }
     const jwtid = randomUUID();
-    const access_token = GenerateToken({
+    const access_token = this._tokenService.GenerateToken({
       payload: { id: user._id },
-      secret_key: ACCESS_SECRET_KEY,
+      secret_key:
+        user.role == RoleEnum.user
+          ? ACCESS_SECRET_KEY_USER
+          : ACCESS_SECRET_KEY_ADMIN,
       options: {
-        expiresIn: 60 * 5,
+        expiresIn: "1day",
         jwtid,
       },
     });
-    res.status(200).json({
-      message: "User signed in successfully ✅",
-      data: { access_token },
+    const refresh_token = this._tokenService.GenerateToken({
+      payload: { id: user._id },
+      secret_key:
+        user.role == RoleEnum.user
+          ? REFRESH_SECRET_KEY_USER
+          : REFRESH_SECRET_KEY_ADMIN,
+      options: {
+        expiresIn: "1day",
+        jwtid,
+      },
+    });
+    successResponse({
+      res,
+      message: `${user.firstName} ${user.lastName} signed in successfully ✅`,
+      data: { access_token, refresh_token },
     });
   };
 
   forgetPassword = async (req: Request, res: Response) => {
-    const { email }: IForgetPasswordType = req.body;
+    const { email }: forgetPasswordDto = req.body;
     const user = await this._userModel.findOne({
       filter: {
         email,
@@ -170,33 +192,37 @@ class AuthService {
       html: emailTemplate(otp),
     });
 
-    await setValue({
-      key: otp_key({ email, subject: EmailEnum.forgetPassword }),
+    await this._redisService.setValue({
+      key: this._redisService.otp_key({
+        email,
+        subject: EmailEnum.forgetPassword,
+      }),
       value: Hash({ plain_text: `${otp}` }),
       ttl: 60 * 2,
     });
-    await incr(max_otp_key(email));
+    await this._redisService.incr(this._redisService.max_otp_key(email));
 
-    res.status(200).json({ message: "Done ✅" });
+    successResponse({ res });
   };
 
-  logOut = async (req: any, res: Response) => {
-    const {flag} = req.query
-    if(flag == "all") {
-      req.user.changeCredential = new Date()
-      await req.user.save()
-    }else {
-      await setValue({
-        key: revoked_key({userId: req.user._id, jti: req.decoded.jti}),
-        value: req.decoded.jti,
-        ttl: req.decoded.exp - Math.floor(Date.now() / 1000) 
-      })
+  logOut = async (req: Request, res: Response) => {
+    const { flag } = req.query;
+    if (flag == "all") {
+      req.user.changeCredential = new Date();
+      await req.user.save();
+    } else {
+      await this._redisService.setValue({
+        key: this._redisService.revoked_key({
+          userId: req.user._id,
+          jti: req.decoded.jti!,
+        }),
+        value: req.decoded.jti!,
+        ttl: req.decoded.exp! - Math.floor(Date.now() / 1000),
+      });
     }
 
-    res.status(200).json({message: "Done"})
-
-  }
- 
+    res.status(200).json({ message: "Done" });
+  };
 }
 
 export default new AuthService();
