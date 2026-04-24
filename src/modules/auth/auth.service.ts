@@ -10,6 +10,7 @@ import { emailTemplate } from "../../common/utils/email/email.template";
 import {
   confirmEmailDto,
   forgetPasswordDto,
+  resendOtpDto,
   signInDto,
   signUpDto,
 } from "./auth.validation";
@@ -18,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import {
   ACCESS_SECRET_KEY_ADMIN,
   ACCESS_SECRET_KEY_USER,
+  AUDIENCE,
   REFRESH_SECRET_KEY_ADMIN,
   REFRESH_SECRET_KEY_USER,
 } from "../../config/config.service";
@@ -25,14 +27,88 @@ import { eventEmitter } from "../../common/utils/email/email.events";
 import { EmailEnum } from "../../common/enum/email.enum";
 import { successResponse } from "../../common/utils/response.success";
 import redisService from "../../common/service/redis.service";
-import TokenService from "../../common/utils/token.service";
+import tokenService from "../../common/utils/token.service";
+import { OAuth2Client, TokenPayload } from "google-auth-library";
+
 
 class AuthService {
   private readonly _userModel = new UserRepository();
-  private readonly _redisService = redisService;
-  private readonly _tokenService = TokenService;
 
   constructor() {}
+
+   sendEmailOtp = async ({
+    email,
+    subject,
+  }: {
+    email: string;
+    subject: EmailEnum;
+  }) => {
+    const isBlocked = (await redisService.ttl(
+      redisService.block_otp_key(email),
+    )) as number;
+    if (isBlocked > 0) {
+      throw new AppError(
+        `You are blocked yet, Try again after ${isBlocked} seconds 🔴`,
+        400,
+      );
+    }
+
+    const otpTTL = (await redisService.ttl(
+      redisService.otp_key({ email, subject }),
+    )) as number;
+    if (otpTTL > 0) {
+      throw new AppError(
+        `We can resend OTP again after ${otpTTL} seconds`,
+        400,
+      );
+    }
+
+    const maxOTP = await redisService.get(redisService.max_otp_key(email));
+    if (maxOTP >= 3) {
+      await redisService.setValue({
+        key: redisService.block_otp_key(email),
+        value: "1",
+        ttl: 60,
+      });
+      await redisService.deleteKey(redisService.max_otp_key(email));
+      throw new AppError(
+        `You have exceeded the maximum number of tries 🔴`,
+        400,
+      );
+    }
+
+    const otp = await generateOtp();
+
+    eventEmitter.emit(EmailEnum.confirmEmail, async () => {
+      await sendEmail({
+        to: email,
+        subject: "Welcome to Social App🤩",
+        html: emailTemplate(otp),
+      });
+      await redisService.setValue({
+        key: redisService.otp_key({ email, subject }),
+        value: Hash({ plain_text: `${otp}` }),
+        ttl: 60 * 2,
+      });
+
+      await redisService.incr(redisService.max_otp_key(email));
+    });
+  };
+
+  resendOtp = async (req:Request, res:Response) => {
+    const {email}: resendOtpDto = req.body
+    const user = await this._userModel.findOne({filter: {
+      email,
+      confirmed: {$exists: false},
+      provider: ProviderEnum.local
+    }})
+    if(!user) {
+      throw new AppError("User not exist or already confirmed ❎", 400)
+    }
+    await this.sendEmailOtp({email, subject: EmailEnum.confirmEmail})
+
+    successResponse({res})
+  }
 
   signUp = async (req: Request, res: Response) => {
     let {
@@ -71,13 +147,13 @@ class AuthService {
         subject: "Email Confirmation ✅",
         html: emailTemplate(otp),
       });
-      await this._redisService.setValue({
-        key: this._redisService.otp_key({ email: email }),
+      await redisService.setValue({
+        key: redisService.otp_key({ email: email }),
         value: Hash({ plain_text: `${otp}` }),
         ttl: 60 * 2,
       });
-      await this._redisService.setValue({
-        key: this._redisService.max_otp_key(email),
+      await redisService.setValue({
+        key: redisService.max_otp_key(email),
         value: "1",
         ttl: 60 * 6,
       });
@@ -93,8 +169,8 @@ class AuthService {
   confirmEmail = async (req: Request, res: Response) => {
     const { email, code }: confirmEmailDto = req.body;
 
-    const otpValue = await this._redisService.get(
-      this._redisService.otp_key({ email }),
+    const otpValue = await redisService.get(
+      redisService.otp_key({ email }),
     );
 
     if (!otpValue) {
@@ -116,8 +192,8 @@ class AuthService {
       throw new AppError("Invalid email or already confirmed 🔴", 400);
     }
 
-    await this._redisService.deleteKey(
-      this._redisService.otp_key({ email, subject: EmailEnum.confirmEmail }),
+    await redisService.deleteKey(
+      redisService.otp_key({ email, subject: EmailEnum.confirmEmail }),
     );
 
     successResponse({ res, message: `${email} confirmed successfully ✅` });
@@ -142,7 +218,7 @@ class AuthService {
       throw new AppError("Invalid password ❎", 400);
     }
     const jwtid = randomUUID();
-    const access_token = this._tokenService.GenerateToken({
+    const access_token = tokenService.GenerateToken({
       payload: { id: user._id },
       secret_key:
         user.role == RoleEnum.user
@@ -153,7 +229,7 @@ class AuthService {
         jwtid,
       },
     });
-    const refresh_token = this._tokenService.GenerateToken({
+    const refresh_token = tokenService.GenerateToken({
       payload: { id: user._id },
       secret_key:
         user.role == RoleEnum.user
@@ -168,6 +244,49 @@ class AuthService {
       res,
       message: `${user.firstName} ${user.lastName} signed in successfully ✅`,
       data: { access_token, refresh_token },
+    });
+  };
+
+  signUpWithGmail = async (req: Request, res: Response) => {
+    const { idToken } = req.body;
+    const client = new OAuth2Client();
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: AUDIENCE,
+    });
+    const payload = ticket.getPayload();
+
+    const { name, email, email_verified } = payload as TokenPayload;
+
+    let user = await this._userModel.findOne({ filter: { email: email! } });
+    if (!user) {
+      user = await this._userModel.create({
+        userName: name,
+        email,
+        confirmed: email_verified,
+        provider: ProviderEnum.google,
+      } as Partial<IUser>);
+    }
+
+    if (user.provider == ProviderEnum.local) {
+      throw new AppError("Please, Login with system 🔴", 400);
+    }
+
+    const access_token = tokenService.GenerateToken({
+      payload: { id: user._id },
+      secret_key:
+        user.role == RoleEnum.user
+          ? ACCESS_SECRET_KEY_USER
+          : ACCESS_SECRET_KEY_ADMIN,
+      options: {
+        jwtid: randomUUID(),
+      },
+    });
+
+    successResponse({
+      res,
+      message: `${name} signed up with gmail successfully ✅`,
+      data: { access_token },
     });
   };
 
@@ -192,15 +311,15 @@ class AuthService {
       html: emailTemplate(otp),
     });
 
-    await this._redisService.setValue({
-      key: this._redisService.otp_key({
+    await redisService.setValue({
+      key: redisService.otp_key({
         email,
         subject: EmailEnum.forgetPassword,
       }),
       value: Hash({ plain_text: `${otp}` }),
       ttl: 60 * 2,
     });
-    await this._redisService.incr(this._redisService.max_otp_key(email));
+    await redisService.incr(redisService.max_otp_key(email));
 
     successResponse({ res });
   };
@@ -211,8 +330,8 @@ class AuthService {
       req.user.changeCredential = new Date();
       await req.user.save();
     } else {
-      await this._redisService.setValue({
-        key: this._redisService.revoked_key({
+      await redisService.setValue({
+        key: redisService.revoked_key({
           userId: req.user._id,
           jti: req.decoded.jti!,
         }),

@@ -31,6 +31,12 @@ export const signUpSchema = {
     ),
 };
 
+export const resendOtpSchema = {
+  body: z.object({
+    email: z.string().email(),
+  })
+}
+
 export const signInSchema = {
   body: z.object({
     email: z.string().email(),
@@ -55,3 +61,4 @@ export type signUpDto = z.infer<typeof signUpSchema.body>;
 export type signInDto = z.infer<typeof signInSchema.body>;
 export type confirmEmailDto = z.infer<typeof confirmEmailSchema.body>;
 export type forgetPasswordDto = z.infer<typeof forgetPasswordSchema.body>;
+export type resendOtpDto = z.infer<typeof resendOtpSchema.body>

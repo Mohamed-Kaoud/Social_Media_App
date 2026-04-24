@@ -9,6 +9,7 @@ const authRouter = Router()
 authRouter.post("/signup", validation(authValidation.signUpSchema) ,AuthService.signUp)
 authRouter.patch("/confirm-email",validation(authValidation.confirmEmailSchema), AuthService.confirmEmail)
 authRouter.post("/signin", validation(authValidation.signInSchema),AuthService.signIn)
+authRouter.post("/signup/gmail", AuthService.signUpWithGmail)
 authRouter.post("/forget-password", validation(authValidation.forgetPasswordSchema), AuthService.forgetPassword)
 authRouter.post("/logout", authentication, AuthService.logOut)
 

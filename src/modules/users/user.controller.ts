@@ -10,7 +10,6 @@ const userRouter = Router()
 
 userRouter.get("/profile", authentication,authorization([RoleEnum.user]), UserService.getProfile)
 userRouter.patch("/update-password", validation(UV.updatePasswordSchema),authentication, UserService.updatePassword)
-userRouter.post("/signup/gmail", UserService.signUpWithGmail)
 
 
 
