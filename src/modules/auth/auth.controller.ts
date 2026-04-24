@@ -7,10 +7,12 @@ import { authentication } from "../../common/middleware/authentication";
 const authRouter = Router()
 
 authRouter.post("/signup", validation(authValidation.signUpSchema) ,AuthService.signUp)
+authRouter.post("/resend-otp", validation(authValidation.resendOtpSchema), AuthService.resendOtp)
 authRouter.patch("/confirm-email",validation(authValidation.confirmEmailSchema), AuthService.confirmEmail)
 authRouter.post("/signin", validation(authValidation.signInSchema),AuthService.signIn)
 authRouter.post("/signup/gmail", AuthService.signUpWithGmail)
 authRouter.post("/forget-password", validation(authValidation.forgetPasswordSchema), AuthService.forgetPassword)
+authRouter.patch("/reset-password", validation(authValidation.resetPasswordSchema), AuthService.resetPassword)
 authRouter.post("/logout", authentication, AuthService.logOut)
 
 export default authRouter

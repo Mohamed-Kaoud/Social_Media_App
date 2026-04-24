@@ -11,6 +11,7 @@ import {
   confirmEmailDto,
   forgetPasswordDto,
   resendOtpDto,
+  resetPasswordDto,
   signInDto,
   signUpDto,
 } from "./auth.validation";
@@ -30,13 +31,12 @@ import redisService from "../../common/service/redis.service";
 import tokenService from "../../common/utils/token.service";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 
-
 class AuthService {
   private readonly _userModel = new UserRepository();
 
   constructor() {}
 
-   sendEmailOtp = async ({
+  sendEmailOtp = async ({
     email,
     subject,
   }: {
@@ -95,21 +95,6 @@ class AuthService {
     });
   };
 
-  resendOtp = async (req:Request, res:Response) => {
-    const {email}: resendOtpDto = req.body
-    const user = await this._userModel.findOne({filter: {
-      email,
-      confirmed: {$exists: false},
-      provider: ProviderEnum.local
-    }})
-    if(!user) {
-      throw new AppError("User not exist or already confirmed ❎", 400)
-    }
-    await this.sendEmailOtp({email, subject: EmailEnum.confirmEmail})
-
-    successResponse({res})
-  }
-
   signUp = async (req: Request, res: Response) => {
     let {
       firstName,
@@ -166,12 +151,27 @@ class AuthService {
     });
   };
 
+  resendOtp = async (req: Request, res: Response) => {
+    const { email }: resendOtpDto = req.body;
+    const user = await this._userModel.findOne({
+      filter: {
+        email,
+        confirmed: { $exists: false },
+        provider: ProviderEnum.local,
+      },
+    });
+    if (!user) {
+      throw new AppError("User not exist or already confirmed ❎", 400);
+    }
+    await this.sendEmailOtp({ email, subject: EmailEnum.confirmEmail });
+
+    successResponse({ res });
+  };
+
   confirmEmail = async (req: Request, res: Response) => {
     const { email, code }: confirmEmailDto = req.body;
 
-    const otpValue = await redisService.get(
-      redisService.otp_key({ email }),
-    );
+    const otpValue = await redisService.get(redisService.otp_key({ email }));
 
     if (!otpValue) {
       throw new Error(`OTP is expired 🔴`, { cause: 404 });
@@ -303,23 +303,43 @@ class AuthService {
       throw new AppError("User not exist or account not confirmed ❎", 404);
     }
 
-    const otp = await generateOtp();
+    await this.sendEmailOtp({ email, subject: EmailEnum.forgetPassword });
 
-    await sendEmail({
-      to: email,
-      subject: "Forget Password OTP",
-      html: emailTemplate(otp),
-    });
+    successResponse({ res });
+  };
 
-    await redisService.setValue({
-      key: redisService.otp_key({
+  resetPassword = async (req: Request, res: Response) => {
+    const { email, code, password }: resetPasswordDto = req.body;
+
+    const otpValue = await redisService.get(
+      redisService.otp_key({ email, subject: EmailEnum.forgetPassword }),
+    );
+    if (!otpValue) {
+      throw new Error("OTP expired 🔴");
+    }
+    if (!Compare({ plain_text: code, cipher_text: otpValue })) {
+      throw new Error("Invalid OTP ❎", { cause: 400 });
+    }
+
+    const user = await this._userModel.findOneAndUpdate({
+      filter: {
         email,
-        subject: EmailEnum.forgetPassword,
-      }),
-      value: Hash({ plain_text: `${otp}` }),
-      ttl: 60 * 2,
+        provider: ProviderEnum.local,
+        confirmed: { $exists: true },
+      },
+      update: {
+        password: Hash({ plain_text: password }),
+        changeCredential: new Date(),
+      },
     });
-    await redisService.incr(redisService.max_otp_key(email));
+
+    if (!user) {
+      throw new Error("User not exist or not confirmed");
+    }
+
+    await redisService.deleteKey(
+      redisService.otp_key({ email, subject: EmailEnum.forgetPassword }),
+    );
 
     successResponse({ res });
   };

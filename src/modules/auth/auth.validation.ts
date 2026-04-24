@@ -34,8 +34,8 @@ export const signUpSchema = {
 export const resendOtpSchema = {
   body: z.object({
     email: z.string().email(),
-  })
-}
+  }),
+};
 
 export const signInSchema = {
   body: z.object({
@@ -51,6 +51,25 @@ export const confirmEmailSchema = {
   }),
 };
 
+export const resetPasswordSchema = {
+  body: z
+    .object({
+      email: z.string().email(),
+      code: z.string().regex(/^\d{6}$/),
+      password: z.string().min(4),
+      cPassword: z.string().min(4),
+    })
+    .refine(
+      (data) => {
+        return data.password == data.cPassword;
+      },
+      {
+        error: "Confirmed password must match the password 🔴",
+        path: ["cPassword"],
+      },
+    ),
+};
+
 export const forgetPasswordSchema = {
   body: z.object({
     email: z.string().email(),
@@ -61,4 +80,5 @@ export type signUpDto = z.infer<typeof signUpSchema.body>;
 export type signInDto = z.infer<typeof signInSchema.body>;
 export type confirmEmailDto = z.infer<typeof confirmEmailSchema.body>;
 export type forgetPasswordDto = z.infer<typeof forgetPasswordSchema.body>;
-export type resendOtpDto = z.infer<typeof resendOtpSchema.body>
+export type resendOtpDto = z.infer<typeof resendOtpSchema.body>;
+export type resetPasswordDto = z.infer<typeof resetPasswordSchema.body>
