@@ -3,6 +3,8 @@ import AuthService from "./auth.service"
 import * as authValidation from "./auth.validation"
 import { validation } from "../../common/middleware/validation";
 import { authentication } from "../../common/middleware/authentication";
+import multerCloud from "../../common/middleware/multer.cloud";
+import { Store_Enum } from "../../common/enum/multer.enum";
 
 const authRouter = Router()
 
@@ -14,5 +16,7 @@ authRouter.post("/signup/gmail", AuthService.signUpWithGmail)
 authRouter.post("/forget-password", validation(authValidation.forgetPasswordSchema), AuthService.forgetPassword)
 authRouter.patch("/reset-password", validation(authValidation.resetPasswordSchema), AuthService.resetPassword)
 authRouter.post("/logout", authentication, AuthService.logOut)
+authRouter.post("/upload", authentication, AuthService.upload)
+
 
 export default authRouter

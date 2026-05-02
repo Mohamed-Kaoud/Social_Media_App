@@ -3,8 +3,8 @@ import type { Request, Response } from "express";
 import { IUpdatePasswordType } from "./user.validation";
 import { Compare, Hash } from "../../common/utils/security/hash.security";
 import { AppError } from "../../common/utils/global-error-handler";
-import TokenService from "../../common/utils/token.service";
-import { successResponse } from "../../common/utils/response.success";
+import TokenService from "../../common/service/token.service";
+import { successResponse } from "../../common/service/response.success";
 
 class UserService {
   private readonly _userModel = new UserRepository();

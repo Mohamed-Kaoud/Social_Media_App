@@ -26,13 +26,15 @@ import {
 } from "../../config/config.service";
 import { eventEmitter } from "../../common/utils/email/email.events";
 import { EmailEnum } from "../../common/enum/email.enum";
-import { successResponse } from "../../common/utils/response.success";
+import { successResponse } from "../../common/service/response.success";
 import redisService from "../../common/service/redis.service";
-import tokenService from "../../common/utils/token.service";
+import tokenService from "../../common/service/token.service";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
+import S3Service from "../../common/service/S3.service";
 
 class AuthService {
   private readonly _userModel = new UserRepository();
+  private readonly _s3service = new S3Service();
 
   constructor() {}
 
@@ -149,6 +151,28 @@ class AuthService {
       message: `${firstName} ${lastName} signed up successfully ✅`,
       data: user,
     });
+  };
+
+  upload = async (req: Request, res: Response) => {
+
+    const { fileName, ContentType } = req.body;
+
+    const { url, Key } = await this._s3service.createPreSignedUrl({
+      path: `users/${req?.user?._id}`,
+      fileName,
+      ContentType,
+    });
+
+    await this._userModel.findOneAndUpdate({
+      filter: {
+        _id: req.user._id
+      },
+      update:{
+        profilePic: Key
+      }
+    })
+
+    successResponse({ res, data: { Key, url } });
   };
 
   resendOtp = async (req: Request, res: Response) => {

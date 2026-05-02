@@ -8,7 +8,7 @@ import {
 } from "../../config/config.service";
 import UserRepository from "../../DB/repositories/user.repository";
 import { Types } from "mongoose";
-import tokenService from "../utils/token.service";
+import tokenService from "../service/token.service";
 import redisService from "../service/redis.service";
 
 const userModel = new UserRepository();

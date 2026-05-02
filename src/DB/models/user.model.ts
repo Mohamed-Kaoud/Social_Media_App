@@ -18,6 +18,7 @@ export interface IUser {
   changeCredential: Date;
   gender?: GenderEnum;
   role?: RoleEnum;
+  profilePic?:string
   provider?: ProviderEnum;
   createdAt: Date;
   updatedAt: Date;
@@ -76,6 +77,7 @@ const userSchema = new mongoose.Schema<IUser>(
       enum: ProviderEnum,
       default: ProviderEnum.local,
     },
+    profilePic: String
   },
   {
     timestamps: true,
