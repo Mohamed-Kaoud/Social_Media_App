@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "cross-env NODE_ENV=production concurrently \"tsc --watch\" \"node dist/index.js\" ",
-    "dev": "cross-env NODE_ENV=development concurrently \"tsc --watch\" \"node --watch dist/index.js\" "
+    "dev": "xcopy src\\config dist\\config /E /I /Y && cross-env NODE_ENV=development concurrently \"tsc --watch\" \"node --watch dist/index.js\" "
   },
   "type": "commonjs",
   "keywords": [],
@@ -22,6 +22,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.2",
+    "firebase-admin": "^13.9.0",
     "google-auth-library": "^10.6.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",

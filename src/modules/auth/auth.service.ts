@@ -31,10 +31,12 @@ import redisService from "../../common/service/redis.service";
 import tokenService from "../../common/service/token.service";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 import S3Service from "../../common/service/S3.service";
+import NotificationService from "../../common/service/notification.service";
 
 class AuthService {
   private readonly _userModel = new UserRepository();
   private readonly _s3service = new S3Service();
+  private readonly _notificationService = NotificationService
 
   constructor() {}
 
@@ -163,15 +165,6 @@ class AuthService {
       ContentType,
     });
 
-    await this._userModel.findOneAndUpdate({
-      filter: {
-        _id: req.user._id
-      },
-      update:{
-        profilePic: Key
-      }
-    })
-
     successResponse({ res, data: { Key, url } });
   };
 
@@ -224,7 +217,7 @@ class AuthService {
   };
 
   signIn = async (req: Request, res: Response) => {
-    const { email, password }: signInDto = req.body;
+    const { email, password, fcm }: signInDto = req.body;
 
     const user = await this._userModel.findOne({
       filter: {
@@ -264,6 +257,19 @@ class AuthService {
         jwtid,
       },
     });
+
+    if(fcm) {
+      await redisService.addFCM({userId: user._id, FCMToken: fcm})
+      const tokens = await redisService.getFCMs(user._id)
+      await this._notificationService.sendNotifications({
+        tokens,
+        data: {
+          title: `Hello ${user.userName} 😍`,
+          body: `Successful Login at ${new Date()} ✅`
+        }
+      })
+    }
+
     successResponse({
       res,
       message: `${user.firstName} ${user.lastName} signed in successfully ✅`,

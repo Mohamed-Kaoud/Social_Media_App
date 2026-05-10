@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 import {
   GenderEnum,
   ProviderEnum,
@@ -22,6 +22,7 @@ export interface IUser {
   provider?: ProviderEnum;
   createdAt: Date;
   updatedAt: Date;
+  friends?: Types.ObjectId[]
 }
 
 const userSchema = new mongoose.Schema<IUser>(
@@ -77,7 +78,8 @@ const userSchema = new mongoose.Schema<IUser>(
       enum: ProviderEnum,
       default: ProviderEnum.local,
     },
-    profilePic: String
+    profilePic: String,
+    friends: [{type: Types.ObjectId, ref: "User"}]
   },
   {
     timestamps: true,
