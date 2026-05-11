@@ -143,7 +143,7 @@ class PostService {
     })
 
     if (!post) {
-        throw new AppError("posy not found or not authorized")
+        throw new AppError("post not found or not authorized")
     }
 
     if (removeFiles?.length) {
