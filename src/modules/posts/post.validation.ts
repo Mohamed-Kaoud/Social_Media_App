@@ -56,5 +56,8 @@ export const updatePostSchema = {
                 })
             }
         }
-    })
+    }),
+
+    params: likeReactSchema.params
+  
 }

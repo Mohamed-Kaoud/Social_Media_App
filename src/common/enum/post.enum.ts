@@ -10,3 +10,8 @@ export enum Allow_Comment_Enum {
     deny = "deny"
     
 }
+
+export enum On_Model_Enum {
+    Post = "Post",
+    Comment = "Comment"
+}
