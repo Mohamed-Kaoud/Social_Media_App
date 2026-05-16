@@ -9,7 +9,7 @@ import { AppError } from "../../common/utils/global-error-handler";
 import { randomUUID } from "node:crypto";
 import { Store_Enum } from "../../common/enum/multer.enum";
 import { successResponse } from "../../common/service/response.success";
-import { createCommentDTO} from "./comment.dto";
+import { createCommentDTO } from "./comment.dto";
 import commentRepository from "../../DB/repositories/comment.repository";
 import { postAvailability } from "../../common/utils/post.utils";
 import { Allow_Comment_Enum, On_Model_Enum } from "../../common/enum/post.enum";
@@ -30,7 +30,7 @@ class PostService {
     const { content, tags, onModel }: createCommentDTO = req.body;
     const { postId, commentId } = req.params;
 
-    let doc: HydratedDocument<IPost | IComment> | null = null
+    let doc: HydratedDocument<IPost | IComment> | null = null;
 
     if (onModel === On_Model_Enum.Post && !commentId) {
       doc = await this._postModel.findOne({
@@ -72,11 +72,11 @@ class PostService {
           400,
         );
       }
-      doc = comment
+      doc = comment;
     }
 
-    if(!doc) {
-      throw new AppError("Invalid onModel value ❎", 400)
+    if (!doc) {
+      throw new AppError("Invalid onModel value ❎", 400);
     }
 
     let mentions: Types.ObjectId[] = [];
@@ -119,7 +119,7 @@ class PostService {
       attachments: urls,
       folderId,
       refId: doc?._id!,
-      onModel
+      onModel,
     });
 
     if (!comment) {
@@ -136,6 +136,178 @@ class PostService {
       });
     }
     successResponse({ res, data: comment });
+  };
+
+  getComments = async (req: Request, res: Response) => {
+    const { postId } = req.params as {
+      postId: string;
+    };
+
+    const comments = await this._commentModel.find({
+      filter: {
+        refId: new Types.ObjectId(postId),
+        onModel: On_Model_Enum.Post,
+      },
+
+      options: {
+        populate: [
+          {
+            path: "replies",
+          },
+        ],
+      },
+    });
+
+    successResponse({
+      res,
+      data: comments,
+    });
+  };
+
+  updateComment = async (req: Request, res: Response) => {
+    const { commentId } = req.params;
+
+    const { content, removeFiles, removeTags, tags } = req.body;
+
+    const comment = await this._commentModel.findOne({
+      filter: {
+        _id: commentId,
+        createdBy: req.user._id,
+      },
+    });
+
+    if (!comment) {
+      throw new AppError("Comment not found ❎", 404);
+    }
+
+    if (removeFiles?.length) {
+      const invalidFiles = removeFiles.filter((file: string) => {
+        return !comment.attachments?.includes(file);
+      });
+
+      if (invalidFiles.length) {
+        throw new AppError("Invalid files ❎", 400);
+      }
+
+      await this._s3service.deleteFiles(removeFiles);
+
+      comment.attachments = comment.attachments?.filter((file: string) => {
+        return !removeFiles.includes(file);
+      }) as string[];
+    }
+
+    const dbTags = new Set(comment.tags?.map((id) => id.toString()));
+
+    removeTags?.forEach((tag: string) => {
+      dbTags.delete(tag);
+    });
+
+    if (tags?.length) {
+      const users = await this._userModel.find({
+        filter: {
+          _id: { $in: tags },
+        },
+      });
+
+      if (users.length !== tags.length) {
+        throw new AppError("Invalid tags ❎", 400);
+      }
+
+      users.forEach((user) => {
+        dbTags.add(user._id.toString());
+      });
+    }
+
+    comment.tags = [...dbTags].map((id) => new Types.ObjectId(id));
+
+    if (req.files) {
+      const urls = (await this._s3service.uploadFiles({
+        files: req.files as Express.Multer.File[],
+        path: `Users/${req.user._id}/posts/comments/${comment.folderId}`,
+        store_type: Store_Enum.memory,
+      })) as string[];
+
+      comment.attachments?.push(...urls);
+    }
+
+    if (content !== undefined) {
+      comment.content = content;
+    }
+
+    await comment.save();
+
+    successResponse({
+      res,
+      data: comment,
+    });
+  };
+
+  deleteComment = async (req: Request, res: Response) => {
+    const { commentId } = req.params;
+
+    const comment = await this._commentModel.findOne({
+      filter: {
+        _id: commentId,
+        createdBy: req.user._id,
+      },
+    });
+
+    if (!comment) {
+      throw new AppError("Comment not found ❎", 404);
+    }
+
+    if (comment.attachments?.length) {
+      await this._s3service.deleteFiles(comment.attachments);
+    }
+
+    await this._commentModel.deleteOne({
+      filter: {
+        _id: commentId,
+      },
+    });
+
+    successResponse({
+      res,
+      message: "Comment deleted successfully ✅",
+    });
+  };
+
+  likeComment = async (req: Request, res: Response) => {
+    const { commentId } = req.params;
+    const { flag } = req.query;
+
+    let updateQuery = {};
+
+    if (flag === "disLike") {
+      updateQuery = {
+        $pull: {
+          likes: req.user._id,
+        },
+      };
+    } else {
+      updateQuery = {
+        $addToSet: {
+          likes: req.user._id,
+        },
+      };
+    }
+
+    const comment = await this._commentModel.findOneAndUpdate({
+      filter: {
+        _id: commentId,
+      },
+
+      update: updateQuery,
+    });
+
+    if (!comment) {
+      throw new AppError("Comment not found ❎", 404);
+    }
+
+    successResponse({
+      res,
+      data: comment,
+    });
   };
 }
 

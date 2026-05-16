@@ -19,13 +19,16 @@ class BaseRepository<Tdocument> {
   async findOne({
     filter,
     projection,
-    options
+    options,
   }: {
     filter: QueryFilter<Tdocument>;
     projection?: ProjectionType<Tdocument>;
-    options?: QueryOptions<Tdocument>
+    options?: QueryOptions<Tdocument>;
   }): Promise<HydratedDocument<Tdocument> | null> {
-    return this.model.findOne(filter).populate(options?.populate as PopulateOptions | PopulateOptions[]).exec();
+    return this.model
+      .findOne(filter)
+      .populate(options?.populate as PopulateOptions | PopulateOptions[])
+      .exec();
   }
 
   async findById(
@@ -43,13 +46,14 @@ class BaseRepository<Tdocument> {
     projection?: ProjectionType<Tdocument>;
     options?: QueryOptions<Tdocument>;
   }): Promise<HydratedDocument<Tdocument>[] | []> {
-    return this.model.find(filter,projection)
-    .skip(options?.skip!)
-    .limit(options?.limit!)
-    .sort(options?.sort)
-    .populate(options?.populate as PopulateOptions)
+    return this.model
+      .find(filter, projection)
+      .skip(options?.skip!)
+      .limit(options?.limit!)
+      .sort(options?.sort)
+      .populate(options?.populate as PopulateOptions);
   }
-    findByIdAndUpdate({
+  findByIdAndUpdate({
     id,
     update,
     options,
@@ -91,39 +95,48 @@ class BaseRepository<Tdocument> {
     limit,
     sort,
     populate,
-    search
+    search,
   }: {
-    page?: number,
-    limit?: number,
-    sort?: any,
-    populate?: any,
-    search?: QueryFilter<T>
+    page?: number;
+    limit?: number;
+    sort?: any;
+    populate?: any;
+    search?: QueryFilter<T>;
   }) {
-    page = +page! || 1
-    limit = +limit! || 1
-    if(page < 1) page = 1
-    if(limit < 1) limit = 2
+    page = +page! || 1;
+    limit = +limit! || 1;
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 2;
 
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
 
     const [data, totalDoc] = await Promise.all([
-      await this.model.find({...(search ?? {})}).limit(limit).skip(skip).sort(sort).populate(populate).exec(),
-      await this.model.countDocuments({...(search ?? {})})
-    ])
+      await this.model
+        .find({ ...(search ?? {}) })
+        .limit(limit)
+        .skip(skip)
+        .sort(sort)
+        .populate(populate)
+        .exec(),
+      await this.model.countDocuments({ ...(search ?? {}) }),
+    ]);
 
-    const totalPages = Math.ceil(totalDoc / limit)
+    const totalPages = Math.ceil(totalDoc / limit);
 
     return {
       meta: {
         currentPage: page,
         totalPages,
         limit,
-        totalDoc
+        totalDoc,
       },
-      data
-    }
+      data,
+    };
+  }
 
+  async deleteOne({ filter }: { filter: QueryFilter<Tdocument> }) {
+    return this.model.deleteOne(filter);
   }
 }
 
-export default BaseRepository
+export default BaseRepository;

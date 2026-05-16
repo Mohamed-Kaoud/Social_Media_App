@@ -5,7 +5,7 @@ import * as CV from "./comment.validation";
 import multerCloud from "../../common/middleware/multer.cloud";
 import { Store_Enum } from "../../common/enum/multer.enum";
 import commentService from "./comment.service";
-const commentRouter = Router({mergeParams: true});
+const commentRouter = Router({ mergeParams: true });
 
 commentRouter.post(
   "/",
@@ -15,7 +15,33 @@ commentRouter.post(
   commentService.createComment,
 );
 
+commentRouter.get(
+  "/",
+  authentication,
+  validation(CV.getCommentsSchema),
+  commentService.getComments,
+);
 
+commentRouter.put(
+  "/:commentId",
+  authentication,
+  multerCloud({ store_type: Store_Enum.memory }).array("attachments"),
+  validation(CV.updateCommentSchema),
+  commentService.updateComment,
+);
 
+commentRouter.delete(
+  "/:commentId",
+  authentication,
+  validation(CV.deleteCommentSchema),
+  commentService.deleteComment,
+);
+
+commentRouter.patch(
+  "/:commentId/like",
+  authentication,
+  validation(CV.likeCommentSchema),
+  commentService.likeComment,
+);
 
 export default commentRouter;

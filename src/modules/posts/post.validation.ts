@@ -61,3 +61,9 @@ export const updatePostSchema = {
     params: likeReactSchema.params
   
 }
+
+export const deletePostSchema = {
+    params: z.object({
+        postId: generalRules.id
+    })
+}

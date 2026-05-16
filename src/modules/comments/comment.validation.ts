@@ -33,3 +33,38 @@ export const createCommentSchema = {
     })
 }
 
+export const getCommentsSchema = {
+  params: z.strictObject({
+    postId: generalRules.id,
+  }),
+};
+
+export const updateCommentSchema = {
+  body: z.object({
+    content: z.string().optional(),
+    attachments: z.array(generalRules.file).optional(),
+    removeFiles: z.array(z.string()).optional(),
+    tags: z.array(generalRules.id).optional(),
+    removeTags: z.array(generalRules.id).optional(),
+  }),
+
+  params: z.strictObject({
+    postId: generalRules.id,
+    commentId: generalRules.id,
+  }),
+};
+
+export const deleteCommentSchema = {
+  params: z.strictObject({
+    postId: generalRules.id,
+    commentId: generalRules.id,
+  }),
+};
+
+export const likeCommentSchema = {
+  params: z.strictObject({
+    postId: generalRules.id,
+    commentId: generalRules.id,
+  }),
+};
+

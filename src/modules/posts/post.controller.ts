@@ -8,7 +8,9 @@ import postService from "./post.service";
 import commentRouter from "../comments/comment.controller";
 const postRouter = Router();
 
-postRouter.use("/:postId/comments{/:commentId/replies}", commentRouter)
+postRouter.use("/:postId/comments", commentRouter);
+
+postRouter.use("/:postId/comments/:commentId/replies", commentRouter);
 
 postRouter.post(
   "/",
@@ -33,6 +35,13 @@ postRouter.patch(
   authentication,
   validation(PV.likeReactSchema),
   postService.likeReact,
+);
+
+postRouter.delete(
+  "/delete-post/:postId",
+  authentication,
+  validation(PV.deletePostSchema),
+  postService.deletePost,
 );
 
 export default postRouter;

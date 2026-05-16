@@ -53,7 +53,7 @@ class PostService {
     if (req?.files) {
       urls = (await this._s3service.uploadFiles({
         files: req.files as Express.Multer.File[],
-        path: `Users/ ${req?.user?._id}/posts/${folderId}`,
+        path: `Users/${req?.user?._id}/posts/${folderId}`,
         store_type: Store_Enum.memory,
       })) as string[];
     }
@@ -85,7 +85,6 @@ class PostService {
   };
 
   getPosts = async (req: Request, res: Response) => {
-
     // const posts = await this._postModel.paginate({
     //   page: +req?.query?.page!,
     //   limit: +req?.query?.limit!,
@@ -100,25 +99,23 @@ class PostService {
 
     const posts = await this._postModel.find({
       filter: {
-        $or: [
-         ...postAvailability(req)
-        ],
+        $or: [...postAvailability(req)],
       },
       options: {
         populate: [
           {
             path: "comments",
             match: {
-              commentId: {$exists: false}
+              commentId: { $exists: false },
             },
             populate: [
               {
-                path: "replies"
-              }
-            ]
-          }
-        ]
-      }
+                path: "replies",
+              },
+            ],
+          },
+        ],
+      },
     });
 
     successResponse({ res, data: posts });
@@ -232,7 +229,7 @@ class PostService {
     if (req?.files) {
       let urls = (await this._s3service.uploadFiles({
         files: req.files as Express.Multer.File[],
-        path: `Users/ ${req?.user?._id}/posts/${post.folderId}`,
+        path: `Users/${req?.user?._id}/posts/${post.folderId}`,
         store_type: Store_Enum.memory,
       })) as string[];
       post.attachments?.push(...urls);
@@ -248,16 +245,42 @@ class PostService {
       });
     }
 
-    if(content) post.content = content
-    if(allowComment) post.allowComment = allowComment
-    if(availability) post.availability = availability
+    if (content) post.content = content;
+    if (allowComment) post.allowComment = allowComment;
+    if (availability) post.availability = availability;
 
-    await post.save()
+    await post.save();
 
-    successResponse({res, data: post})
+    successResponse({ res, data: post });
+  };
 
+  deletePost = async (req: Request, res: Response) => {
+    const { postId } = req.params;
 
+    const post = await this._postModel.findOne({
+      filter: {
+        _id: postId,
+        createdBy: req.user._id,
+      },
+    });
+    if (!post) {
+      throw new AppError(
+        "Post not found or you are not allowed to perform this action",
+        404,
+      );
+    }
 
+    if (post.attachments?.length) {
+      await this._s3service.deleteFiles(post.attachments);
+    }
+
+    await this._postModel.deleteOne({
+      filter: {
+        _id: postId,
+      },
+    });
+
+    successResponse({ res, message: "Post deleted successfully ✅" });
   };
 }
 
