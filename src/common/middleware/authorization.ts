@@ -12,3 +12,9 @@ export const authorization = (roles: string[] = []) => {
     next();
   };
 };
+
+export const authorization_gql = async (roles: string[], role: string) => {
+  if(!roles.includes(role)) {
+    throw new AppError("Unauthorized access", 401)
+  }
+};

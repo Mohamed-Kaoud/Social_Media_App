@@ -62,3 +62,42 @@ export const authentication = async (
 
   next();
 };
+
+export const authentication_gql = async (authorization: string) => {
+  if (!authorization) {
+    throw new AppError("Authorization header is required 🔴", 400);
+  }
+  const parts = authorization.split(" ");
+  if (parts.length !== 2) {
+    throw new AppError("Invalid authorization header format ❎", 400);
+  }
+  const [prefix, token] = parts;
+
+  let ACCESS_SECRET_KEY = "";
+
+  if (prefix == USER_PREFIX) {
+    ACCESS_SECRET_KEY = ACCESS_SECRET_KEY_USER;
+  } else if (prefix == ADMIN_PREFIX) {
+    ACCESS_SECRET_KEY = ACCESS_SECRET_KEY_ADMIN;
+  } else {
+    throw new AppError("Invalid prefix ❎", 400);
+  }
+
+  if (!token) {
+    throw new AppError("Token is missing 🔴", 400);
+  }
+
+  const decoded = tokenService.VerifyToken({
+    token,
+    secret_key: ACCESS_SECRET_KEY,
+  });
+  const user = await userModel.findById(new Types.ObjectId(decoded.id));
+  if (!user) {
+    throw new AppError("User not found ❎", 404);
+  }
+
+  return {
+    user,
+    decoded,
+  };
+};

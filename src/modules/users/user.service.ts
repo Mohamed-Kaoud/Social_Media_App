@@ -5,6 +5,13 @@ import { Compare, Hash } from "../../common/utils/security/hash.security";
 import { AppError } from "../../common/utils/global-error-handler";
 import TokenService from "../../common/service/token.service";
 import { successResponse } from "../../common/service/response.success";
+import { Types } from "mongoose";
+
+const users = [
+  { id: 1, name: "Mohamed Elsayed", age: 20, gender: "male" },
+  { id: 2, name: "Ahmed Elsayed", age: 22, gender: "male" },
+  { id: 3, name: "Amr Elsayed", age: 24, gender: "male" },
+];
 
 class UserService {
   private readonly _userModel = new UserRepository();
@@ -28,6 +35,14 @@ class UserService {
     await req.user.save();
 
     successResponse({ res, message: "Password updated successfully ✅" });
+  };
+
+  graphQl_GetUser = async (userId: Types.ObjectId) => {
+    return await this._userModel.findOne({filter: {_id: userId}})
+  };
+
+  graphQl_GetUsers = async () => {
+    return await this._userModel.find({filter:{}})
   };
 }
 

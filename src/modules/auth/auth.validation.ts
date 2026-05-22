@@ -5,6 +5,11 @@ import {
   RoleEnum,
 } from "../../common/enum/user.enum";
 
+export const getUserSchame_gql = z.strictObject({
+  token: z.string()
+})
+
+
 export const signUpSchema = {
   body: z
     .object({

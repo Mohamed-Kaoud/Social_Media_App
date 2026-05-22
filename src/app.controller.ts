@@ -14,8 +14,9 @@ import userRouter from "./modules/users/user.controller";
 import redisService from "./common/service/redis.service";
 import notificationService from "./common/service/notification.service";
 import postRouter from "./modules/posts/post.controller";
-import { GraphQLInt, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLSchema, GraphQLString } from "graphql";
 import { createHandler } from "graphql-http/lib/use/express";
+import { GraphQLEnumType, GraphQLInt, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLSchema, GraphQLString } from "graphql";
+import { gql_schema } from "./modules/graphql/graphql.schema";
 
 const app: express.Application = express();
 const port: number = PORT;
@@ -40,64 +41,7 @@ const bootstrap = () => {
     res.status(200).json({ message: "Welcome on Social Media App 😍🤩" });
   });
 
-  // const schema = new GraphQLSchema({
-  //   query: new GraphQLObjectType({
-  //     name: "RootSchema",
-  //     description: "Return Hello",
-  //     fields: {
-  //       hello: {
-  //         type: GraphQLString,
-  //         resolve: () => {
-  //           return "Hello World 💓";
-  //         },
-  //       },
-  //     },
-  //   }),
-  // });
-
-
-//   const users = [
-//   { id: 1, name: "Mohamed", age: 20 },
-//   { id: 2, name: "Ahmed", age: 22 },
-//   { id: 3, name: "Ali", age: 25 }
-// ]
-
-
-// const userType = new GraphQLObjectType({
-//   name: "User",
-//   description: "get one user",
-//   fields: {
-//     id: { type: GraphQLInt },
-//     name: { type: GraphQLString },
-//     age: { type: GraphQLInt }
-//   }
-// })
-
-//   const schema = new GraphQLSchema({
-//   query: new GraphQLObjectType({
-//     name: "RootQueryType",
-//     fields: {
-//       getUser: {
-//         type: userType,
-//         args: {
-//           name: { type: new GraphQLNonNull(GraphQLString) }
-//         },
-//         resolve: (parent, args) => {
-//           return users.find(user => user.name == args.name)
-//         }
-//       },
-
-//       listUsers: {
-//         type: new GraphQLList(userType),
-//         resolve: () => {
-//           return users
-//         }
-//       }
-//     }
-//   })
-// })
-
-//   app.use("/graphql", createHandler({schema}))
+  app.use("/graphql", createHandler({schema: gql_schema, context: (req) => ({req})}))
 
 
   app.post("/send-notification", (req: Request, res: Response) => {
