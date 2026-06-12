@@ -4,6 +4,7 @@ import {
   ProviderEnum,
   RoleEnum,
 } from "../../common/enum/user.enum";
+import { generalRules } from "../../common/utils/generalRules";
 
 export const getUserSchame_gql = z.strictObject({
   token: z.string()
@@ -24,6 +25,7 @@ export const signUpSchema = {
       gender: z.enum(GenderEnum).optional(),
       provider: z.enum(ProviderEnum).optional(),
       role: z.enum(RoleEnum).optional(),
+      friends: z.array(generalRules.id).optional()
     })
     .refine(
       (data) => {
@@ -46,7 +48,7 @@ export const signInSchema = {
   body: z.object({
     email: z.string().email(),
     password: z.string().min(4),
-    fcm: z.string()
+    // fcm: z.string()
   }),
 };
 

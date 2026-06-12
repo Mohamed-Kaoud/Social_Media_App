@@ -1,4 +1,4 @@
-import { HydratedDocument } from "mongoose";
+import { HydratedDocument, Types } from "mongoose";
 import { AppError } from "../../common/utils/global-error-handler";
 import UserRepository from "../../DB/repositories/user.repository";
 import type { Request, Response } from "express";
@@ -110,6 +110,7 @@ class AuthService {
       address,
       gender,
       role,
+      friends
     }: signUpDto = req.body;
     const emailExist = await this._userModel.findOne({ filter: { email } });
     if (emailExist) {
@@ -126,6 +127,7 @@ class AuthService {
       address,
       gender,
       role,
+      friends: friends?.map((id) => new Types.ObjectId(id)),
     } as Partial<IUser>);
 
     const otp = await generateOtp();
@@ -217,7 +219,7 @@ class AuthService {
   };
 
   signIn = async (req: Request, res: Response) => {
-    const { email, password, fcm }: signInDto = req.body;
+    const { email, password}: signInDto = req.body;
 
     const user = await this._userModel.findOne({
       filter: {
@@ -258,8 +260,8 @@ class AuthService {
       },
     });
 
-    if(fcm) {
-      await redisService.addFCM({userId: user._id, FCMToken: fcm})
+    if(req.body.fcm) {
+      await redisService.addFCM({userId: user._id, FCMToken: req.body.fcm})
       const tokens = await redisService.getFCMs(user._id)
       await this._notificationService.sendNotifications({
         tokens,
@@ -272,7 +274,7 @@ class AuthService {
 
     successResponse({
       res,
-      message: `${user.firstName} ${user.lastName} signed in successfully ✅`,
+      message: `Done`,
       data: { access_token, refresh_token },
     });
   };

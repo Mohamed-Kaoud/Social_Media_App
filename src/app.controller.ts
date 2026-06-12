@@ -15,27 +15,50 @@ import redisService from "./common/service/redis.service";
 import notificationService from "./common/service/notification.service";
 import postRouter from "./modules/posts/post.controller";
 import { createHandler } from "graphql-http/lib/use/express";
-import { GraphQLEnumType, GraphQLInt, GraphQLList, GraphQLNonNull, GraphQLObjectType, GraphQLSchema, GraphQLString } from "graphql";
 import { gql_schema } from "./modules/graphql/graphql.schema";
+import socketGateway from "./modules/realtime/socket.gateway";
+import { pipeline } from "stream/promises";
+import S3Service from "./common/service/S3.service";
 
 const app: express.Application = express();
 const port: number = PORT;
 
-const bootstrap = () => {
-  const limiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 20,
-    legacyHeaders: false,
-    handler: (req: Request, res: Response, next: NextFunction) => {
-      throw new AppError("Too many requests 🔴, Try again later", 429);
-    },
-  });
+const bootstrap = async () => {
+  // const limiter = rateLimit({
+  //   windowMs: 60 * 60 * 1000,
+  //   max: 20,
+  //   legacyHeaders: false,
+  //   handler: (req: Request, res: Response, next: NextFunction) => {
+  //     throw new AppError("Too many requests 🔴, Try again later", 429);
+  //   },
+  // });
 
   app.use(express.json());
-  app.use(cors(), helmet(), limiter);
+  app.use(cors(), helmet());
 
   checkConnectionDB();
   redisService.connect();
+
+//   app.get("/upload/*path", async (req: Request, res: Response, next: NextFunction) => {
+//   const { path } = req.params as { path: string[] }
+//   const key = path.join("/")
+//   const { download } = req.query
+
+//   const result = await new S3Service().getFile(key)
+
+//   const stream = result.Body as NodeJS.ReadableStream
+
+//   res.setHeader("Content-Type", result.ContentType!)
+
+//   if (download === "true") {
+//     res.setHeader(
+//       "Content-Disposition",
+//       `attachment; filename="${path.pop()}"`
+//     )
+//   }
+
+//   await pipeline(stream, res)
+// })
 
   app.get("/", (req: Request, res: Response) => {
     res.status(200).json({ message: "Welcome on Social Media App 😍🤩" });
@@ -55,6 +78,14 @@ const bootstrap = () => {
     console.log({ token: req.body.token });
   });
 
+
+  const httpServer = app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  })
+
+  await socketGateway.initIO(httpServer)
+
+
   app.use("/auth", authRouter);
   app.use("/users", userRouter);
   app.use("/posts", postRouter);
@@ -65,9 +96,9 @@ const bootstrap = () => {
 
   app.use(globalErrorHandler);
 
-  app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-  });
+  // app.listen(port, () => {
+  //   console.log(`Server is running on port ${port}`);
+  // });
 };
 
 export default bootstrap;

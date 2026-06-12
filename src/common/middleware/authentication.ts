@@ -13,13 +13,8 @@ import redisService from "../service/redis.service";
 
 const userModel = new UserRepository();
 
-export const authentication = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  const { authorization } = req.headers;
-  if (!authorization) {
+export const decodeToken_and_fetchUser = async (authorization: string) => {
+    if (!authorization) {
     throw new AppError("Authorization header is required 🔴", 400);
   }
   const parts = authorization.split(" ");
@@ -57,6 +52,18 @@ export const authentication = async (
   if (revokeToken) {
     throw new AppError("Token revoked 🔴", 400);
   }
+
+  return {user, decoded}
+}
+
+export const authentication = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const { authorization } = req.headers;
+
+  const {user,decoded} = await decodeToken_and_fetchUser(authorization!)
   req.user = user;
   req.decoded = decoded;
 

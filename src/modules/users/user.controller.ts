@@ -8,7 +8,7 @@ import * as UV from "./user.validation"
 
 const userRouter = Router()
 
-userRouter.get("/profile", authentication,authorization([RoleEnum.user]), UserService.getProfile)
+userRouter.get("/profile", authentication, UserService.getProfile)
 userRouter.patch("/update-password", validation(UV.updatePasswordSchema),authentication, UserService.updatePassword)
 
 

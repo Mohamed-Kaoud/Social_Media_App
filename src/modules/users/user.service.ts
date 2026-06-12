@@ -19,7 +19,18 @@ class UserService {
   constructor() {}
 
   getProfile = async (req: Request, res: Response) => {
-    successResponse({ res, data: { user: req.user } });
+    const user = await this._userModel.findOne({
+      filter: { _id: req.user?._id as Types.ObjectId },
+      options: {
+        populate: [
+          {
+            path: "friends",
+          },
+        ],
+      },
+    });
+
+    successResponse({ res, data: { user } });
   };
 
   updatePassword = async (req: Request, res: Response) => {
@@ -38,11 +49,11 @@ class UserService {
   };
 
   graphQl_GetUser = async (userId: Types.ObjectId) => {
-    return await this._userModel.findOne({filter: {_id: userId}})
+    return await this._userModel.findOne({ filter: { _id: userId } });
   };
 
   graphQl_GetUsers = async () => {
-    return await this._userModel.find({filter:{}})
+    return await this._userModel.find({ filter: {} });
   };
 }
 
