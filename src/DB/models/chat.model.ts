@@ -12,9 +12,9 @@ export interface IChat {
   messages: IMessage[];
 
   //OVM
-  group: string;
-  groupImage: string;
-  roomId: string;
+  group?: string;
+  groupImage?: string;
+  roomId?: string;
 }
 
 const messageSchema = new mongoose.Schema<IMessage>(
